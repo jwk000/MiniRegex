@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace MiniRegex
 {
 
-    /************实现一个正则表达式的子集*******************************************************
+    /************实现一个正则表达式的子集************************************************
     *
     * \d 数字[0-9]
     * \D 非数字
@@ -32,133 +32,18 @@ namespace MiniRegex
     * $  行尾不含\n
     * 
     * ******************************************************************************
-    */
-
-
-
-    /*
-     * EBNF描述语法规则
-     * pattern : alternative 
-     * alternative:  term ['|' alternative]
-     * term: atom [affix] [term+] 
-     * atom : '(' pattern ')' | '[' charset ']' | meta 
-     * meta : '.' |'\d'|'\s'|'\w'|'\t'|'\r'|'\n'|charactor
-     * charset: charactor '-' charactor | charactor+ | '^' charset
-     * affix : '+'|'*'|'?'| '{' m[ ',' n] '}' 
-     * charactor : any valid char
-     * 
-     */
-
-    class StringReader
-    {
-        public string Input { get; private set; }
-        public int Index { get; private set; }
-        public StringReader(string input) { Input = input; }
-        public StringReader Clone()
-        {
-            var ret = new StringReader(Input);
-            ret.Index = Index;
-            return ret;
-        }
-        public void CopyFrom(StringReader sr)
-        {
-            Input = sr.Input;
-            Index = sr.Index;
-        }
-        public char Read()
-        {
-            if (Index >= Input.Length)
-            {
-                return char.MinValue;
-            }
-            return Input[Index++];
-        }
-
-        public char Peek()
-        {
-            if (Index >= Input.Length)
-            {
-                return char.MinValue;
-            }
-            return Input[Index];
-        }
-        public char ReadBack(int n)
-        {
-            int idx = Index - n;
-            if (idx < 0)
-            {
-                return char.MinValue;
-            }
-            return Input[idx];
-        }
-        public void RollBack(int n = 1)
-        {
-            Index -= n;
-        }
-        public void Forward(int n = 1)
-        {
-            Index += n;
-        }
-
-        public bool EOF()
-        {
-            return Index >= Input.Length;
-        }
-        public string ReadFromTo(int from, int to)
-        {
-            if (from >= 0 && from < to)
-            {
-                return Input.Substring(from, to-from);
-            }
-            return null;
-        }
-        public string ReadTo(char C)//包含index不包含C
-        {
-            int idx = Index;
-            while (idx++ < Input.Length - 1)
-            {
-                if (Input[idx] == C)
-                {
-                    string ans = Input.Substring(Index, idx - Index);
-                    Index = idx + 1;
-                    return ans;
-                }
-            }
-            return null;
-        }
-
-        public string ReadToEnd()
-        {
-            return Input.Substring(Index);
-        }
-
-        public string ReadMatch(char left, char right)
-        {
-            int depth = 1;
-            int idx = Index;
-            while (idx++ < Input.Length - 1)
-            {
-                char c = Input[idx];
-                if (c == left)
-                {
-                    depth++;
-                }
-                else if (c == right)
-                {
-                    depth--;
-                    if (depth == 0)
-                    {
-                        string ans = Input.Substring(Index, idx - Index);
-                        Index = idx + 1;
-                        return ans;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-    }
+    *
+    * EBNF描述语法规则
+    * pattern : alternative 
+    * alternative:  term ['|' alternative]
+    * term: atom [affix] [term+] 
+    * atom : '(' pattern ')' | '[' charset ']' | meta 
+    * meta : '.' |'\d'|'\s'|'\w'|'\t'|'\r'|'\n'|charactor
+    * charset: charactor '-' charactor | charactor+ | '^' charset
+    * affix : '+'|'*'|'?'| '{' m[ ',' n] '}' 
+    * charactor : any valid char
+    * 
+    ********************************************************************************/
 
 
     enum MetaType
@@ -196,8 +81,8 @@ namespace MiniRegex
             return ret;
         }
 
-        protected virtual bool ImplParse(StringReader stringReader){ return true; }
-        public virtual bool Match(StringReader input) {  return false; }
+        protected virtual bool ImplParse(StringReader stringReader) { return true; }
+        public virtual bool Match(StringReader input) { return false; }
         public override string ToString()
         {
             return PatternString;
@@ -214,8 +99,6 @@ namespace MiniRegex
             return ret;
         }
 
-        
-
         public override bool Match(StringReader input)
         {
             if (alter.Match(input))
@@ -231,7 +114,6 @@ namespace MiniRegex
         public TermExp term;
         public AlterExp alter;
 
-        
         protected override bool ImplParse(StringReader stringReader)
         {
             term = new TermExp();
@@ -270,12 +152,9 @@ namespace MiniRegex
     class TermExp : AExp
     {
         public AtomExp atom;
-
-        public int from = 1, to = 1;
-        public int max = 0;
+        public int from = 1, to = 1, max = 0;
         public TermExp term;
 
-        
         protected override bool ImplParse(StringReader stringReader)
         {
             atom = new AtomExp();
@@ -382,7 +261,7 @@ namespace MiniRegex
             else
             {
                 //从后往前回溯
-                for (int j = max; j >= from; )
+                for (int j = max; j >= from;)
                 {
                     var clone = input.Clone();
                     if (term.Match(clone))
@@ -396,7 +275,6 @@ namespace MiniRegex
                     }
                 }
             }
-
             return false;
         }
     }
@@ -406,7 +284,7 @@ namespace MiniRegex
         public AlterExp group;
         public CharsetExp charset;
         public MetaExp meta;
-        
+
         protected override bool ImplParse(StringReader stringReader)
         {
             char c = stringReader.Peek();
@@ -460,7 +338,7 @@ namespace MiniRegex
         public char char1;
         public char char2;
         public bool incharset = false;
-        
+
         protected override bool ImplParse(StringReader stringReader)
         {
             char c = stringReader.Read();
@@ -502,9 +380,7 @@ namespace MiniRegex
                         char1 = d;
                         return true;
                     }
-
                     return false;
-
                 }
             }
             else
@@ -532,7 +408,6 @@ namespace MiniRegex
                         char1 = d;
                         return true;
                     }
-
                     return false;
                 }
             }
@@ -549,7 +424,7 @@ namespace MiniRegex
             switch (metaType)
             {
                 case MetaType.Any:
-                    return c!='\n'&&c!='\r';
+                    return c != '\n' && c != '\r';
                 case MetaType.Digit:
                     return char.IsDigit(c);
                 case MetaType.NDigit:
@@ -570,6 +445,7 @@ namespace MiniRegex
                     {
                         char back = input.ReadBack(2);
                         char forward = input.Peek();
+                        input.RollBack();
                         bool b1 = back == char.MinValue || char.IsWhiteSpace(back);
                         bool b2 = forward == char.MinValue || char.IsWhiteSpace(forward);
                         if (b1 && !b2 || !b1 && b2)
@@ -579,15 +455,10 @@ namespace MiniRegex
                         return false;
                     }
                 case MetaType.LineBegin:
-                    {
-                        input.RollBack();
-                        return input.Index ==0;
-                    }
+                    input.RollBack();
+                    return input.Index == 0;
                 case MetaType.LineEnd:
-                    {
-                        return c == char.MinValue;
-                    }
-
+                    return c == char.MinValue;
                 default:
                     return false;
             }
@@ -599,7 +470,6 @@ namespace MiniRegex
         public bool Not;
         public List<MetaExp> metas;
 
-        
         protected override bool ImplParse(StringReader stringReader)
         {
             int beginIdx = stringReader.Index;
@@ -620,7 +490,6 @@ namespace MiniRegex
                 }
                 metas.Add(meta);
             }
-
             return true;
         }
 
@@ -673,8 +542,5 @@ namespace MiniRegex
         {
             return Exp.Match(new StringReader(input));
         }
-
     }
-
-
 }
