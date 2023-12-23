@@ -1,4 +1,6 @@
-﻿namespace MiniRegex
+﻿using System.Diagnostics;
+
+namespace MiniRegex
 {
     internal class Program
     {
@@ -90,7 +92,7 @@
 
             {
                 // Test Case 15: Complex Combination
-                MiniRegex reg = new MiniRegex(@"(\w{2}\d)+[aeiou]+");
+                MiniRegex reg = new MiniRegex(@"(\w{2}\d+)+[aeiou]+");
                 Console.WriteLine("{0} {1}", i++, reg.IsMatch("ab12aeiou")); // Expected: Match
             }
 
@@ -136,9 +138,29 @@
 
             {
                 //23
-                MiniRegex reg = new MiniRegex(@"a*a*a*a*a*a*a*a*a*a*aaaaaab");
-                bool ret = reg.IsMatch("aaaaaaaaaaaaaaaaaaaaaaaaaaaab");
-                Console.WriteLine("{0} {1}", i++, ret);
+                MiniRegex reg = new MiniRegex(@"a?a");
+                bool ret = reg.IsMatch("a");
+                Console.WriteLine("{0} {1} ", i++, ret);
+            }
+
+            {
+                //24
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                MiniRegex reg = new MiniRegex(@"a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa");
+                bool ret = reg.IsMatch("aaaaaaaaaaaaaaaaaaaaaaaaa");//3s
+                Console.WriteLine("{0} {1} {2}", i++, ret, sw.Elapsed);
+                sw.Stop();
+            }
+
+            {
+                //25
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                MiniRegex reg = new MiniRegex(@"a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*aaaaaaaaaaaaaa");
+                bool ret = reg.IsMatch("aaaaaaaaaaaaaa");
+                Console.WriteLine("{0} {1} {2}", i++, ret, sw.Elapsed);//10s
+                sw.Stop();
             }
 
         }

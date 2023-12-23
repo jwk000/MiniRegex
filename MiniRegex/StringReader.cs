@@ -57,6 +57,11 @@ namespace MiniRegex
             Index += n;
         }
 
+        public void RollBackTo(int idx)
+        {
+            Index = idx;
+        }
+
         public bool EOF()
         {
             return Index >= Input.Length;

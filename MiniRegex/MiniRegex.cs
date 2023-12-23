@@ -38,7 +38,7 @@ namespace MiniRegex
     * alternative:  term ['|' alternative]
     * term: atom [affix] [term+] 
     * atom : '(' pattern ')' | '[' charset ']' | meta 
-    * meta : '.' |'\d'|'\s'|'\w'|'\t'|'\r'|'\n'|charactor
+    * meta : '.' |'\d'|'\s'|'\w'|'\t'|'\r'|'\n'|'\b'|'^'|'$'|charactor
     * charset: charactor '-' charactor | charactor+ | '^' charset
     * affix : '+'|'*'|'?'| '{' m[ ',' n] '}' 
     * charactor : any valid char
@@ -81,7 +81,7 @@ namespace MiniRegex
             return ret;
         }
 
-        protected virtual bool ImplParse(StringReader stringReader) { return true; }
+        protected virtual bool ImplParse(StringReader stringReader) { return false; }
         public virtual bool Match(StringReader input) { return false; }
         public override string ToString()
         {
@@ -103,7 +103,7 @@ namespace MiniRegex
         {
             if (alter.Match(input))
             {
-                return input.EOF();
+                return input.EOF();//匹配结束了才算成功
             }
             return false;
         }
@@ -239,17 +239,18 @@ namespace MiniRegex
                     }
                 }
             }
-            //实际匹配的最大数量
+            //贪婪匹配，计算实际匹配的最大数量
             max = from;
             while (!input.EOF() && (to == -1 || max < to))
             {
+                int idx = input.Index;
                 if (atom.Match(input))
                 {
                     max++;
                 }
                 else
                 {
-                    input.RollBack();
+                    input.RollBackTo(idx);
                     break;
                 }
             }
@@ -260,8 +261,8 @@ namespace MiniRegex
             }
             else
             {
-                //从后往前回溯
-                for (int j = max; j >= from;)
+                //从后往前回溯，超过from的部分都可以回退
+                do
                 {
                     var clone = input.Clone();
                     if (term.Match(clone))
@@ -269,11 +270,15 @@ namespace MiniRegex
                         input.CopyFrom(clone);
                         return true;
                     }
-                    if (--j > from)//回退不能超过from
+                    if (max-- > from)
                     {
                         input.RollBack();
                     }
-                }
+                    else
+                    {
+                        break;
+                    }
+                } while (true);
             }
             return false;
         }
@@ -445,7 +450,7 @@ namespace MiniRegex
                     {
                         char back = input.ReadBack(2);
                         char forward = input.Peek();
-                        input.RollBack();
+                        if (c != char.MinValue) input.RollBack();
                         bool b1 = back == char.MinValue || char.IsWhiteSpace(back);
                         bool b2 = forward == char.MinValue || char.IsWhiteSpace(forward);
                         if (b1 && !b2 || !b1 && b2)
@@ -455,7 +460,7 @@ namespace MiniRegex
                         return false;
                     }
                 case MetaType.LineBegin:
-                    input.RollBack();
+                    if (c != char.MinValue) input.RollBack();
                     return input.Index == 0;
                 case MetaType.LineEnd:
                     return c == char.MinValue;
