@@ -307,10 +307,11 @@ namespace MiniRegex
 
         public override NFAFrag ToNFA()
         {
- 
+            NFAFrag frag = new NFAFrag();
             NFAFrag atomFrag = atom.ToNFA();
-            NFAFrag frag = atomFrag.Clone();
-
+            var clone = atomFrag.Clone();
+            frag.Start.Add(clone.Start);
+            clone.End.Add(frag.End);
 
             if (from == 0)
             {
@@ -339,16 +340,17 @@ namespace MiniRegex
 
             var termStart = new NFAState();
             var termEnd = termStart;
-            if (term != null) 
-            { 
+            if (term != null)
+            {
                 var termFrag = term.ToNFA();
                 termStart = termFrag.Start;
                 termEnd = termFrag.End;
             }
 
-            if (from < to)
+            //已经有一个了，计算剩余数量需要-1
+            if (from+1 < to)
             {
-                for (int i = 0; i < to - from; i++)
+                for (int i = 0; i < to - from-1; i++)
                 {
                     var next = atomFrag.Clone();
                     frag.End.Add(termStart);
@@ -417,7 +419,7 @@ namespace MiniRegex
 
         public override NFAFrag ToNFA()
         {
-            if(group != null)
+            if (group != null)
             {
                 return group.ToNFA();
             }
@@ -667,7 +669,7 @@ namespace MiniRegex
         public int ID;
         public IExp Exp = null;
         public List<NFAState> Branchs = new List<NFAState>();
-        
+
         public NFAState()
         {
             ID = __id++;
@@ -711,31 +713,36 @@ namespace MiniRegex
 
             List<NFAState> list1 = new List<NFAState>();
             List<NFAState> list2 = new List<NFAState>();
-            List<NFAState> visited = new List<NFAState>();
+            Dictionary<NFAState, NFAState> visited = new Dictionary<NFAState, NFAState>();
             list1.Add(Start);
             list2.Add(ret.Start);
-            while(list1.Count > 0)
+            while (list1.Count > 0)
             {
                 var state = list1[0];
                 var copy = list2[0];
                 list1.RemoveAt(0);
                 list2.RemoveAt(0);
-                visited.Add(state);                
+                visited.Add(state, copy);
                 copy.Exp = state.Exp;
 
-                foreach(var b in state.Branchs)
+                foreach (var b in state.Branchs)
                 {
+                    bool isvisited = visited.ContainsKey(b);
                     NFAState c = null;
                     if (b == End)
                     {
                         c = ret.End;
+                    }
+                    else if (isvisited)
+                    {
+                        c = visited[b];
                     }
                     else
                     {
                         c = new NFAState() { Exp = b.Exp };
                     }
                     copy.Add(c);
-                    if (!visited.Contains(b))
+                    if (!isvisited)
                     {
                         list1.Add(b);
                         list2.Add(c);
@@ -759,8 +766,11 @@ namespace MiniRegex
             {
                 var s = list[0];
                 list.RemoveAt(0);
+                if (visited.Contains(s))
+                {
+                    continue;
+                }
                 visited.Add(s);
-
                 foreach (var b in s.Branchs)
                 {
                     sb.Append($"s{s.ID} -> s{b.ID}");
@@ -799,16 +809,16 @@ namespace MiniRegex
 
         public void Merge()
         {
-            Dictionary<NFAState,List<NFAState>> dict = new Dictionary<NFAState, List<NFAState>>();
+            Dictionary<NFAState, List<NFAState>> dict = new Dictionary<NFAState, List<NFAState>>();
             List<NFAState> list = new List<NFAState>();
             List<NFAState> visited = new List<NFAState>();
             list.Add(Start);
-            while(list.Count > 0)
+            while (list.Count > 0)
             {
                 var s = list[0];
                 list.RemoveAt(0);
                 visited.Add(s);
-                foreach(var b in s.Branchs)
+                foreach (var b in s.Branchs)
                 {
                     if (!dict.ContainsKey(b)) { dict[b] = new List<NFAState>(); }
                     dict[b].Add(s);
@@ -825,13 +835,14 @@ namespace MiniRegex
                 var s = list[0];
                 list.RemoveAt(0);
                 visited.Add(s);
-                for(int i=s.Branchs.Count-1;i>=0; i--)
+                for (int i = s.Branchs.Count - 1; i >= 0; i--)
                 {
                     var b = s.Branchs[i];
+                    //如果b是空节点且只有一个前置节点s，s和b合并
                     if (b.Exp == null && dict[b].Count == 1)
                     {
-                        //如果b是空节点且只有一个前置节点s，s和b合并
                         s.Branchs.RemoveAt(i);
+                        dict.Remove(b);
                         s.Branchs = s.Branchs.Union(b.Branchs).ToList();
                         list.Add(s);
                         if (b == End) { End = s; }
