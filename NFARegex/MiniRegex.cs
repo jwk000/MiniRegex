@@ -1,12 +1,11 @@
-﻿using Microsoft.VisualBasic;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MiniRegex
+namespace NFARegex
 {
 
     /************实现一个正则表达式的子集************************************************
@@ -69,7 +68,7 @@ namespace MiniRegex
     {
         bool Parse(StringReader stringReader);
         bool Match(StringReader input);
-        NFAFrag ToNFA();
+        NFAState ToNFA(NFAState parent, NFAState end);
     }
 
     abstract class AExp : IExp
@@ -87,7 +86,7 @@ namespace MiniRegex
 
         protected virtual bool ImplParse(StringReader stringReader) { return false; }
         public virtual bool Match(StringReader input) { return false; }
-        public virtual NFAFrag ToNFA() { return null; }
+        public virtual NFAState ToNFA(NFAState parent, NFAState end) { return null; }
     }
 
     class PatternExp : AExp
@@ -109,9 +108,9 @@ namespace MiniRegex
             return false;
         }
 
-        public override NFAFrag ToNFA()
+        public override NFAState ToNFA(NFAState parent, NFAState end)
         {
-            return alter.ToNFA();
+            return alter.ToNFA(parent, end);
         }
     }
 
@@ -154,20 +153,16 @@ namespace MiniRegex
             return false;
         }
 
-        public override NFAFrag ToNFA()
+        public override NFAState ToNFA(NFAState parent, NFAState end)
         {
-            NFAFrag frag = new NFAFrag();
 
-            NFAFrag ret = term.ToNFA();
-            frag.Start.Add(ret.Start);
-            ret.End.Add(frag.End);
+            var alt = term.ToNFA(parent, end);
+            parent.Branchs.Add(alt);
             if (alter != null)
             {
-                ret = alter.ToNFA();
-                frag.Start.Add(ret.Start);
-                ret.End.Add(frag.End);
+                alter.ToNFA(parent, end);
             }
-            return frag;
+            return parent;
         }
     }
 
@@ -305,61 +300,45 @@ namespace MiniRegex
             return false;
         }
 
-        public override NFAFrag ToNFA()
+        public override NFAState ToNFA(NFAState parent, NFAState end)
         {
- 
-            NFAFrag atomFrag = atom.ToNFA();
-            NFAFrag frag = atomFrag.Clone();
-
+            NFAState start;
+            var cur = atom.ToNFA(null, end);
+            start = cur;
 
             if (from == 0)
             {
-                frag.Start.Add(frag.End);
-                if (to == -1)
-                {
-                    frag.End.Add(frag.Start);
-                }
+                start.CanSkip = true;
             }
-            else
+            for (int i = 0; i < from; i++)
             {
-                NFAFrag lastFrag = frag;
-                //已经有一个了，所以从1开始
-                for (int i = 1; i < from; i++)
-                {
-                    var next = atomFrag.Clone();
-                    frag.End.Add(next.Start);
-                    frag.End = next.End;
-                    lastFrag = next;
-                }
-                if (to == -1)
-                {
-                    lastFrag.End.Add(lastFrag.Start);
-                }
+                var t = cur.Clone();
+                cur.Branchs.Add(t);
+                cur = t;
             }
-
-            var termStart = new NFAState();
-            var termEnd = termStart;
+            if (to == -1)
+            {
+                cur.Branchs.Add(cur);
+            }
+            var next = end;//如果后面没有了就结束了
             if (term != null) 
             { 
-                var termFrag = term.ToNFA();
-                termStart = termFrag.Start;
-                termEnd = termFrag.End;
+                next = term.ToNFA(null, end); 
             }
 
             if (from < to)
             {
-                for (int i = 0; i < to - from; i++)
+                NFAState last = cur;
+                for (int j = 0; j < to - from; j++)
                 {
-                    var next = atomFrag.Clone();
-                    frag.End.Add(termStart);
-                    frag.End.Add(next.Start);
-                    frag.End = next.End;
+                    var t = cur.Clone();
+                    t.Branchs.Add(next);
+                    last.Branchs.Add(t);
+                    last = t;
                 }
             }
-
-            frag.End.Add(termStart);
-            frag.End = termEnd;
-            return frag;
+            cur.Branchs.Add(next);
+            return start;
         }
     }
 
@@ -415,19 +394,19 @@ namespace MiniRegex
             return false;
         }
 
-        public override NFAFrag ToNFA()
+        public override NFAState ToNFA(NFAState parent, NFAState end)
         {
             if(group != null)
             {
-                return group.ToNFA();
+                return group.ToNFA(parent, end);
             }
             if (charset != null)
             {
-                return charset.ToNFA();
+                return charset.ToNFA(parent, end);
             }
             if (meta != null)
             {
-                return meta.ToNFA();
+                return meta.ToNFA(parent, end);
             }
             return null;
         }
@@ -565,12 +544,11 @@ namespace MiniRegex
             }
         }
 
-        public override NFAFrag ToNFA()
+        public override NFAState ToNFA(NFAState parent, NFAState end)
         {
-            NFAFrag frag = new NFAFrag();
-            frag.Start.Exp = this;
-            frag.Start.Add(frag.End);
-            return frag;
+            NFAState start = new NFAState();
+            start.Exp = this;
+            return start;
         }
     }
 
@@ -628,16 +606,15 @@ namespace MiniRegex
             return match;
         }
 
-        public override NFAFrag ToNFA()
+        public override NFAState ToNFA(NFAState parent, NFAState end)
         {
-            NFAFrag frag = new NFAFrag();
-            frag.Start.Exp = this;
-            frag.Start.Add(frag.End);
-            return frag;
+            NFAState start = new NFAState();
+            start.Exp = this;
+            return start;
         }
     }
 
-    class MiniRegex
+    public class MiniRegex
     {
         PatternExp Exp = new PatternExp();
         public string Pattern { get; private set; }
@@ -663,210 +640,35 @@ namespace MiniRegex
 
     class NFAState
     {
-        static int __id = 0;
-        public int ID;
-        public IExp Exp = null;
+        public bool CanSkip = false;//表示可以无条件转换到这个状态
+        public IExp Exp;
         public List<NFAState> Branchs = new List<NFAState>();
-        
-        public NFAState()
-        {
-            ID = __id++;
-        }
-        public override string ToString()
-        {
-            return $"{ID}|<{Exp}>|{Branchs.Count}";
-        }
 
-        public void Add(NFAState state)
+        public NFAState Clone()
         {
-            if (Branchs.Contains(state))
-            {
-                return;
-            }
-            Branchs.Add(state);
+            NFAState ret = new NFAState();
+            ret.Exp = Exp;
+            return ret;
         }
 
         public bool Match(StringReader sr)
         {
-            if (Exp == null)
-            {
-                return true;
-            }
-            return Exp.Match(sr);
-        }
-    }
-
-    class NFAFrag
-    {
-        public NFAState Start = new NFAState();
-        public NFAState End = new NFAState();
-        public NFAFrag()
-        {
-
-        }
-
-        public NFAFrag Clone()
-        {
-            NFAFrag ret = new NFAFrag();
-
-            List<NFAState> list1 = new List<NFAState>();
-            List<NFAState> list2 = new List<NFAState>();
-            List<NFAState> visited = new List<NFAState>();
-            list1.Add(Start);
-            list2.Add(ret.Start);
-            while(list1.Count > 0)
-            {
-                var state = list1[0];
-                var copy = list2[0];
-                list1.RemoveAt(0);
-                list2.RemoveAt(0);
-                visited.Add(state);                
-                copy.Exp = state.Exp;
-
-                foreach(var b in state.Branchs)
-                {
-                    NFAState c = null;
-                    if (b == End)
-                    {
-                        c = ret.End;
-                    }
-                    else
-                    {
-                        c = new NFAState() { Exp = b.Exp };
-                    }
-                    copy.Add(c);
-                    if (!visited.Contains(b))
-                    {
-                        list1.Add(b);
-                        list2.Add(c);
-                    }
-                }
-            }
-
-            return ret;
-        }
-
-        public override string ToString()
-        {
-            StringBuilder sb = new StringBuilder();
-            sb.Append("digraph G{");
-            List<NFAState> list = new List<NFAState>();
-            List<NFAState> visited = new List<NFAState>();
-            list.Add(Start);
-            sb.Append($"s{Start.ID}[label=\"start\"];");
-            sb.Append($"s{End.ID}[label=\"end\"];");
-            while (list.Count > 0)
-            {
-                var s = list[0];
-                list.RemoveAt(0);
-                visited.Add(s);
-
-                foreach (var b in s.Branchs)
-                {
-                    sb.Append($"s{s.ID} -> s{b.ID}");
-                    if (b.Exp != null)
-                    {
-                        sb.Append($"[label=\"{b.Exp}\"]");
-                    }
-                    sb.Append(";");
-                    if (!visited.Contains(b))
-                    {
-                        list.Add(b);
-                    }
-                }
-            }
-            sb.Append("}");
-
-            return sb.ToString();
-        }
-
-        public void DumpGraph(string name)
-        {
-            if (!Directory.Exists("image"))
-            {
-                Directory.CreateDirectory("image");
-            }
-            File.WriteAllText($"{name}.dot", this.ToString());
-            System.Diagnostics.Process process = new System.Diagnostics.Process();
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.CreateNoWindow = true;
-            process.StartInfo.FileName = "dot";
-            process.StartInfo.Arguments = string.Format($"{name}.dot -Tjpg -o image/{name}.jpg");
-            process.Start();
-            process.WaitForExit();
-        }
-
-        public void Merge()
-        {
-            Dictionary<NFAState,List<NFAState>> dict = new Dictionary<NFAState, List<NFAState>>();
-            List<NFAState> list = new List<NFAState>();
-            List<NFAState> visited = new List<NFAState>();
-            list.Add(Start);
-            while(list.Count > 0)
-            {
-                var s = list[0];
-                list.RemoveAt(0);
-                visited.Add(s);
-                foreach(var b in s.Branchs)
-                {
-                    if (!dict.ContainsKey(b)) { dict[b] = new List<NFAState>(); }
-                    dict[b].Add(s);
-                    if (!visited.Contains(b))
-                    {
-                        list.Add(b);
-                    }
-                }
-            }
-            visited.Clear();
-            list.Add(Start);
-            while (list.Count > 0)
-            {
-                var s = list[0];
-                list.RemoveAt(0);
-                visited.Add(s);
-                for(int i=s.Branchs.Count-1;i>=0; i--)
-                {
-                    var b = s.Branchs[i];
-                    if (b.Exp == null && dict[b].Count == 1)
-                    {
-                        //如果b是空节点且只有一个前置节点s，s和b合并
-                        s.Branchs.RemoveAt(i);
-                        s.Branchs = s.Branchs.Union(b.Branchs).ToList();
-                        list.Add(s);
-                        if (b == End) { End = s; }
-                        break;
-                    }
-                    if (!visited.Contains(b))
-                    {
-                        list.Add(b);
-                    }
-                }
-            }
-
+            return Exp.Match(sr.Clone());
         }
     }
 
     class NFARegex
     {
-        static int id = 0;
-        NFAState Start, End;
+        NFAState Start = new NFAState();
+        NFAState End = new NFAState();
         PatternExp Exp = new PatternExp();
         public NFARegex(string pattern)
         {
-            id++;
             if (!Exp.Parse(new StringReader(pattern)))
             {
                 throw new Exception("invalid pattern string");
             }
-            NFAFrag frag = Exp.ToNFA();
-            frag.DumpGraph($"regex{id}.raw");
-            frag.Merge();
-            frag.DumpGraph($"regex{id}");
-            Start = frag.Start;
-            End = frag.End;
-
-
+            Exp.ToNFA(Start, End);
         }
 
         public bool IsMatch(string input)
@@ -874,34 +676,31 @@ namespace MiniRegex
             Queue<NFAState> queue = new Queue<NFAState>();
             queue.Enqueue(Start);
 
-            var sr = new StringReader(input);
-            while (queue.Count > 0 && !sr.EOF())
+            return bfs(queue, new StringReader(input));
+        }
+
+        bool bfs(Queue<NFAState> queue, StringReader sr)
+        {
+            while(queue.Count > 0 && !sr.EOF())
             {
                 NFAState s = queue.Dequeue();
-
-                foreach (var t in s.Branchs)
+                if (s == End)
                 {
-                    int index = sr.Index;
-
-                    if (t == End)
-                    {
-                        sr.Forward();
-                        if (sr.EOF())
-                        {
-                            return true;
-                        }
-                    }
-                    else if (t.Match(sr))
+                    return true;
+                }
+                
+                foreach(var t in s.Branchs)
+                {
+                    if (t.Match(sr))
                     {
                         queue.Enqueue(t);
                     }
-
-                    sr.RollBackTo(index);
                 }
                 sr.Forward();
             }
             return false;
         }
+
     }
 
 }
