@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NFARegex
+namespace MiniRegex
 {
-
     /************实现一个正则表达式的子集************************************************
     *
     * \d 数字[0-9]
@@ -46,7 +44,6 @@ namespace NFARegex
     * 
     ********************************************************************************/
 
-
     enum MetaType
     {
         Any,
@@ -57,18 +54,26 @@ namespace NFARegex
         Word,
         NWord,
         Range,
-        Char,
-        Bound,
-        NBound,
-        LineBegin,
-        LineEnd
+        Char
+    }
+
+    [Flags]
+    enum CharFlag
+    {
+        Normal = 0,
+        LineBegin = 1,
+        LineEnd = 2,
+        LeftBoundary = 3,
+        RightBoundary = 4,
+        NBound = 5,//非边界
     }
 
     interface IExp
     {
         bool Parse(StringReader stringReader);
         bool Match(StringReader input);
-        NFAState ToNFA(NFAState parent, NFAState end);
+        NFAFrag ToNFA();
+        
     }
 
     abstract class AExp : IExp
@@ -86,7 +91,7 @@ namespace NFARegex
 
         protected virtual bool ImplParse(StringReader stringReader) { return false; }
         public virtual bool Match(StringReader input) { return false; }
-        public virtual NFAState ToNFA(NFAState parent, NFAState end) { return null; }
+        public virtual NFAFrag ToNFA() { return null; }
     }
 
     class PatternExp : AExp
@@ -108,9 +113,9 @@ namespace NFARegex
             return false;
         }
 
-        public override NFAState ToNFA(NFAState parent, NFAState end)
+        public override NFAFrag ToNFA()
         {
-            return alter.ToNFA(parent, end);
+            return alter.ToNFA();
         }
     }
 
@@ -153,16 +158,20 @@ namespace NFARegex
             return false;
         }
 
-        public override NFAState ToNFA(NFAState parent, NFAState end)
+        public override NFAFrag ToNFA()
         {
+            NFAFrag frag = new NFAFrag();
 
-            var alt = term.ToNFA(parent, end);
-            parent.Branchs.Add(alt);
+            NFAFrag ret = term.ToNFA();
+            frag.Start.Add(ret.Start);
+            ret.End.Add(frag.End);
             if (alter != null)
             {
-                alter.ToNFA(parent, end);
+                ret = alter.ToNFA();
+                frag.Start.Add(ret.Start);
+                ret.End.Add(frag.End);
             }
-            return parent;
+            return frag;
         }
     }
 
@@ -267,7 +276,7 @@ namespace NFARegex
                 }
                 else
                 {
-                    input.RollBackTo(idx);
+                    input.SetIndex(idx);
                     break;
                 }
             }
@@ -300,45 +309,84 @@ namespace NFARegex
             return false;
         }
 
-        public override NFAState ToNFA(NFAState parent, NFAState end)
+        public override NFAFrag ToNFA()
         {
-            NFAState start;
-            var cur = atom.ToNFA(null, end);
-            start = cur;
+            NFAFrag frag = new NFAFrag();
 
+            //atom部分
+            NFAFrag atomFrag = atom.ToNFA();
+
+            //term部分
+            NFAState termStart;
+            NFAState termEnd;
+            if (term != null)
+            {
+                var termFrag = term.ToNFA();
+                termStart = termFrag.Start;
+                termEnd = termFrag.End;
+            }
+            else
+            {
+                termStart = new NFAState();
+                termEnd = termStart;
+            }
+
+            NFAFrag atomClone = atomFrag.Clone();
+            frag.Start.Add(atomClone.Start);
+            atomClone.End.Add(frag.End);
+
+            //处理量词
             if (from == 0)
             {
-                start.CanSkip = true;
-            }
-            for (int i = 0; i < from; i++)
-            {
-                var t = cur.Clone();
-                cur.Branchs.Add(t);
-                cur = t;
-            }
-            if (to == -1)
-            {
-                cur.Branchs.Add(cur);
-            }
-            var next = end;//如果后面没有了就结束了
-            if (term != null) 
-            { 
-                next = term.ToNFA(null, end); 
-            }
-
-            if (from < to)
-            {
-                NFAState last = cur;
-                for (int j = 0; j < to - from; j++)
+                frag.Start.Add(termStart);
+                if (to == -1) //{0,-1}
                 {
-                    var t = cur.Clone();
-                    t.Branchs.Add(next);
-                    last.Branchs.Add(t);
-                    last = t;
+                    frag.End.Add(frag.Start);
+                    frag.End.Add(termStart);
+                }
+                else //{0,3}
+                {
+                    for (int i = 0; i < to - 1; i++)
+                    {
+                        var next = atomFrag.Clone();
+                        frag.End.Add(next.Start);
+                        frag.End.Add(termStart);
+                        frag.End = next.End;
+                    }
+                    frag.End.Add(termStart);
                 }
             }
-            cur.Branchs.Add(next);
-            return start;
+            else
+            {
+                NFAFrag lastFrag = frag;
+                //已经有一个了，所以从1开始
+                for (int i = 1; i < from; i++)
+                {
+                    var next = atomFrag.Clone();
+                    frag.End.Add(next.Start);
+                    frag.End = next.End;
+                    lastFrag = next;
+                }
+                if (to == -1)
+                {
+                    lastFrag.End.Add(lastFrag.Start);
+                    lastFrag.End.Add(termStart);
+                }
+                else
+                {
+                    for (int i = 0; i < to - from; i++)
+                    {
+                        var next = atomFrag.Clone();
+                        frag.End.Add(next.Start);
+                        frag.End.Add(termStart);
+                        frag.End = next.End;
+                    }
+                    frag.End.Add(termStart);
+                }
+            }
+      
+            frag.End = termEnd;
+            return frag;
         }
     }
 
@@ -394,19 +442,19 @@ namespace NFARegex
             return false;
         }
 
-        public override NFAState ToNFA(NFAState parent, NFAState end)
+        public override NFAFrag ToNFA()
         {
-            if(group != null)
+            if (group != null)
             {
-                return group.ToNFA(parent, end);
+                return group.ToNFA();
             }
             if (charset != null)
             {
-                return charset.ToNFA(parent, end);
+                return charset.ToNFA();
             }
             if (meta != null)
             {
-                return meta.ToNFA(parent, end);
+                return meta.ToNFA();
             }
             return null;
         }
@@ -418,6 +466,7 @@ namespace NFARegex
         public char char1;
         public char char2;
         public bool incharset = false;
+        public CharFlag flag;//TODO 边界的解析和匹配（连续边界可压缩）
 
         protected override bool ImplParse(StringReader stringReader)
         {
@@ -466,8 +515,6 @@ namespace NFARegex
             else
             {
                 if (c == '.') { metaType = MetaType.Any; return true; }
-                if (c == '^') { metaType = MetaType.LineBegin; return true; }
-                if (c == '$') { metaType = MetaType.LineEnd; return true; }
                 if (c == '\\')
                 {
                     char d = stringReader.Read();
@@ -477,8 +524,6 @@ namespace NFARegex
                     if (d == 'W') { metaType = MetaType.NWord; return true; }
                     if (d == 's') { metaType = MetaType.Space; return true; }
                     if (d == 'S') { metaType = MetaType.NSpace; return true; }
-                    if (d == 'b') { metaType = MetaType.Bound; return true; }
-                    if (d == 'B') { metaType = MetaType.NBound; return true; }
                     if (d == 't') { metaType = MetaType.Char; char1 = '\t'; return true; }
                     if (d == 'r') { metaType = MetaType.Char; char1 = '\r'; return true; }
                     if (d == 'n') { metaType = MetaType.Char; char1 = '\n'; return true; }
@@ -488,6 +533,7 @@ namespace NFARegex
                         char1 = d;
                         return true;
                     }
+
                     return false;
                 }
             }
@@ -521,34 +567,44 @@ namespace NFARegex
                     return c >= char1 && c <= char2;
                 case MetaType.Char:
                     return c == char1;
-                case MetaType.Bound:
-                    {
-                        char back = input.ReadBack(2);
-                        char forward = input.Peek();
-                        if (c != char.MinValue) input.RollBack();
-                        bool b1 = back == char.MinValue || char.IsWhiteSpace(back);
-                        bool b2 = forward == char.MinValue || char.IsWhiteSpace(forward);
-                        if (b1 && !b2 || !b1 && b2)
-                        {
-                            return true;
-                        }
-                        return false;
-                    }
-                case MetaType.LineBegin:
-                    if (c != char.MinValue) input.RollBack();
-                    return input.Index == 0;
-                case MetaType.LineEnd:
-                    return c == char.MinValue;
+                //case MetaType.Bound:
+                //    {
+                //        char back = input.ReadBack(2);
+                //        char forward = input.Peek();
+                //        if (c != char.MinValue) input.RollBack();
+                //        bool b1 = back == char.MinValue || char.IsWhiteSpace(back);
+                //        bool b2 = forward == char.MinValue || char.IsWhiteSpace(forward);
+                //        if (b1 && !b2 || !b1 && b2)
+                //        {
+                //            return true;
+                //        }
+                //        return false;
+                //    }
+                //case MetaType.LineBegin:
+                //    if (c != char.MinValue) input.RollBack();
+                //    return input.Index == 0;
+                //case MetaType.LineEnd:
+                //    return c == char.MinValue;
                 default:
                     return false;
             }
         }
 
-        public override NFAState ToNFA(NFAState parent, NFAState end)
+        public override NFAFrag ToNFA()
         {
-            NFAState start = new NFAState();
-            start.Exp = this;
-            return start;
+            NFAFrag frag = new NFAFrag();
+            frag.Start.Exp = this;
+            frag.Start.Add(frag.End);
+            return frag;
+        }
+
+        public bool IsEqualExp(MetaExp rhs)
+        {
+            if(metaType == rhs.metaType && char1==rhs.char1 && char2==rhs.char2 && flag == rhs.flag)
+            {
+                return true;
+            }
+            return false;
         }
     }
 
@@ -606,101 +662,31 @@ namespace NFARegex
             return match;
         }
 
-        public override NFAState ToNFA(NFAState parent, NFAState end)
+        public override NFAFrag ToNFA()
         {
-            NFAState start = new NFAState();
-            start.Exp = this;
-            return start;
+            NFAFrag frag = new NFAFrag();
+            frag.Start.Exp = this;
+            frag.Start.Add(frag.End);
+            return frag;
         }
-    }
 
-    public class MiniRegex
-    {
-        PatternExp Exp = new PatternExp();
-        public string Pattern { get; private set; }
-        public MiniRegex(string pattern)
+
+        public bool IsEqualExp(CharsetExp rhs)
         {
-            Pattern = pattern;
-            if (!Parse(pattern))
+            if(Not == rhs.Not && metas.Count == rhs.metas.Count)
             {
-                throw new ArgumentException("invalid pattern");
-            }
-        }
-
-        bool Parse(string pattern)
-        {
-            return Exp.Parse(new StringReader(pattern));
-        }
-
-        public bool IsMatch(string input)
-        {
-            return Exp.Match(new StringReader(input));
-        }
-    }
-
-    class NFAState
-    {
-        public bool CanSkip = false;//表示可以无条件转换到这个状态
-        public IExp Exp;
-        public List<NFAState> Branchs = new List<NFAState>();
-
-        public NFAState Clone()
-        {
-            NFAState ret = new NFAState();
-            ret.Exp = Exp;
-            return ret;
-        }
-
-        public bool Match(StringReader sr)
-        {
-            return Exp.Match(sr.Clone());
-        }
-    }
-
-    class NFARegex
-    {
-        NFAState Start = new NFAState();
-        NFAState End = new NFAState();
-        PatternExp Exp = new PatternExp();
-        public NFARegex(string pattern)
-        {
-            if (!Exp.Parse(new StringReader(pattern)))
-            {
-                throw new Exception("invalid pattern string");
-            }
-            Exp.ToNFA(Start, End);
-        }
-
-        public bool IsMatch(string input)
-        {
-            Queue<NFAState> queue = new Queue<NFAState>();
-            queue.Enqueue(Start);
-
-            return bfs(queue, new StringReader(input));
-        }
-
-        bool bfs(Queue<NFAState> queue, StringReader sr)
-        {
-            while(queue.Count > 0 && !sr.EOF())
-            {
-                NFAState s = queue.Dequeue();
-                if (s == End)
+                for(int i=0;i<metas.Count;i++)
                 {
-                    return true;
-                }
-                
-                foreach(var t in s.Branchs)
-                {
-                    if (t.Match(sr))
+                    if (! metas[i].IsEqualExp(rhs.metas[i]))
                     {
-                        queue.Enqueue(t);
+                        return false;
                     }
                 }
-                sr.Forward();
+                return true;
             }
             return false;
         }
-
     }
+
 
 }

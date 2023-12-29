@@ -6,330 +6,50 @@ namespace MiniRegex
     {
         static void Main(string[] args)
         {
-            //TestMiniRegex();
-            TestNFARegex();
-        }
-        static void TestMiniRegex()
-        {
-
-            int i = 1;
+            var testcases = new[]
             {
-                // Test Case 1: Basic Meta Characters
-                MiniRegex reg = new MiniRegex("abc");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("abc")); // Expected: Match
-            }
-            {
-                // Test Case 2: Meta Characters with Quantifiers
-                MiniRegex reg = new MiniRegex("a+");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("aaa")); // Expected: Match
-            }
+                new []{"abc","abc" },
+                new []{"a+","aaa" },
+                new []{ "[aeiou]" ,"o"},
+                new []{ "[0-8]+", "012345678" },
+                new []{ "[^aeiou]" ,"x"},
+                new []{ "[a-z]" ,"m"},
+                new []{ "a{2,4}" ,"aaa"},
+                new []{ "(abc)+" ,"abcabc"},
+                new []{ "cat|dog" ,"dog"},
+                new []{ @"\d\s\w" ,"1 a"},
+                new []{ @"(\d{2,3}[a-z]){2}" , "12b45c" },
+                new []{ @"\[\d{3}\]" ,"[123]"},
+                new []{ @"\w{3,5}\d{2,3}" ,"abc123"},
+                new []{ @"(ab)+\d{2}" , "ab12aeiou" },
+                new []{ @"(\d{2,3}[a-z]+){2,3}", "12xyz34abc567defg" },
+                new []{ @"[ \t\r\n]*\w+\s*=\s*[0-9]{1,}\s*" , "    aabb   =  9988 " },
+                new []{ @"(-\d{2,3}-\d{3})+" , "-11-222-333-555" },
+                new []{ @"[a-f]*abc" , "abcdefabcdefabc" },
+                new []{ @"a?a" ,"a"},
+                new []{ @"a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa" , "aaaaaaaaaaaaaaaaaaaaaaaaa" },
+                new []{ @"a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*aaaaaaaaaaaaaa" , "aaaaaaaaaaaaaa" }
 
-            {
-                // Test Case 3: Character Set
-                MiniRegex reg = new MiniRegex("[aeiou]");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("o")); // Expected: Match
-            }
+            };
 
+            Stopwatch sw = new Stopwatch();
+            foreach (var tc in testcases)
             {
-                // Test Case 4: Character Set with Quantifier
-                MiniRegex reg = new MiniRegex("[aeiou]+");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("aei")); // Expected: Match
-            }
-
-            {
-                // Test Case 5: Negated Character Set
-                MiniRegex reg = new MiniRegex("[^aeiou]");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("x")); // Expected: Match
-            }
-
-            {
-                // Test Case 6: Character Range
-                MiniRegex reg = new MiniRegex("[a-z]");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("m")); // Expected: Match
-            }
-
-            {
-                // Test Case 7: Quantifier Range
-                MiniRegex reg = new MiniRegex("a{2,4}");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("aaa")); // Expected: Match
-            }
-
-            {
-                // Test Case 8: Grouping
-                MiniRegex reg = new MiniRegex("(abc)+");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("abcabc")); // Expected: Match
-            }
-
-            {
-                // Test Case 9: Meta Characters and Escaping
-                MiniRegex reg = new MiniRegex(@"\d\s\w");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("1 A")); // Expected: Match
-            }
-
-            {
-                // Test Case 10: Complex Pattern
-                MiniRegex reg = new MiniRegex(@"(\d{2,3}[a-z]){2}");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("12b45c")); // Expected: Match
-            }
-
-            {
-                // Test Case 11: Alternation
-                MiniRegex reg = new MiniRegex("cat|dog");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("dog")); // Expected: Match
-            }
-
-            {
-                // Test Case 12: Escaping Special Characters
-                MiniRegex reg = new MiniRegex(@"\[\d{3}\]");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("[123]")); // Expected: Match
-            }
-
-            {
-                // Test Case 13: Multiple Quantifiers
-                MiniRegex reg = new MiniRegex(@"\w{3,5}\d{2,3}");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("abc123")); // Expected: Match
-            }
-
-            {
-                // Test Case 14: Grouping and Quantifiers
-                MiniRegex reg = new MiniRegex(@"(ab)+\d{2}");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("abab12")); // Expected: Match
-            }
-
-            {
-                // Test Case 15: Complex Combination
-                MiniRegex reg = new MiniRegex(@"(\w{2}\d+)+[aeiou]+");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("ab12aeiou")); // Expected: Match
-            }
-
-            {
-                // Test Case 16: Nested Grouping
-                MiniRegex reg = new MiniRegex(@"(\d{2,3}[a-z]+){2,3}");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("12xyz34abc567defg")); // Expected: Match
-            }
-
-            {
-                // Test Case 17: Start and End Anchors
-                MiniRegex reg = new MiniRegex(@"^\d{3}-\w{2}$");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("123-AB")); // Expected: Match
-            }
-
-            {
-                // Test Case 18: Word Boundary
-                MiniRegex reg = new MiniRegex(@"\w+word\b");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("keyword")); // Expected: Match
-            }
-
-
-            {
-                //19
-                MiniRegex reg = new MiniRegex(@"[ \t\r\n]*\w+\s*=\s*[0-9]{1,}\s*");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("    aabb   =  9988 "));
-            }
-
-            {
-                //20
-                MiniRegex reg = new MiniRegex(@"(-\d{2,3}-\d{3})+");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("-11-222-333-44")); //false
-                //21
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("-11-222-333-555")); //true
-            }
-
-            {
-                //22
-                MiniRegex reg = new MiniRegex(@"[a-f]*abc");
-                bool ret = reg.IsMatch("abcdefabcdefabc");
-                Console.WriteLine("{0} {1}", i++, ret);
-            }
-
-            {
-                //23
-                MiniRegex reg = new MiniRegex(@"a?a");
-                bool ret = reg.IsMatch("a");
-                Console.WriteLine("{0} {1} ", i++, ret);
-            }
-
-            {
-                //24
-                Stopwatch sw = new Stopwatch();
-                sw.Start();
-                MiniRegex reg = new MiniRegex(@"a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa");
-                bool ret = reg.IsMatch("aaaaaaaaaaaaaaaaaaaaaaaaa");//3s
-                Console.WriteLine("{0} {1} {2}", i++, ret, sw.Elapsed);
+                sw.Restart();
+                MiniRegex reg = new MiniRegex(tc[0]);
+                bool ret = reg.IsMatch(tc[1]);
                 sw.Stop();
+                Console.WriteLine("{0} --- {1}\n ismatch:{2} use:{3}ms\n", tc[0], tc[1],ret,sw.ElapsedMilliseconds);
             }
 
+            foreach (var tc in testcases)
             {
-                //25
-                Stopwatch sw = new Stopwatch();
-                sw.Start();
-                MiniRegex reg = new MiniRegex(@"a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*aaaaaaaaaaaaaa");
-                bool ret = reg.IsMatch("aaaaaaaaaaaaaa");
-                Console.WriteLine("{0} {1} {2}", i++, ret, sw.Elapsed);//10s
+                sw.Restart();
+                NFARegex reg = new NFARegex(tc[0]);
+                bool ret = reg.IsMatch(tc[1]);
                 sw.Stop();
+                Console.WriteLine("{0} --- {1}\n ismatch:{2} use:{3}ms\n", tc[0], tc[1], ret, sw.ElapsedMilliseconds);
             }
-
-        }
-
-        static void TestNFARegex()
-        {
-            int i = 1;
-            {
-                // Test Case 1: Basic Meta Characters
-                NFARegex reg = new NFARegex("abc");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("abc")); // Expected: Match
-            }
-            {
-                // Test Case 2: Meta Characters with Quantifiers
-                NFARegex reg = new NFARegex("a+");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("aaa")); // Expected: Match
-            }
-
-            {
-                // Test Case 3: Character Set
-                NFARegex reg = new NFARegex("[aeiou]");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("o")); // Expected: Match
-            }
-
-            {
-                // Test Case 4: Character Set with Quantifier
-                NFARegex reg = new NFARegex("[aeiou]+");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("aei")); // Expected: Match
-            }
-
-            {
-                // Test Case 5: Negated Character Set
-                NFARegex reg = new NFARegex("[^aeiou]");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("x")); // Expected: Match
-            }
-
-            {
-                // Test Case 6: Character Range
-                NFARegex reg = new NFARegex("[a-z]");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("m")); // Expected: Match
-            }
-
-            {
-                // Test Case 7: Quantifier Range
-                NFARegex reg = new NFARegex("a{2,4}");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("aaa")); // Expected: Match
-            }
-
-            {
-                // Test Case 8: Grouping
-                NFARegex reg = new NFARegex("(abc)+");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("abcabc")); // Expected: Match
-            }
-
-            {
-                // Test Case 9: Meta Characters and Escaping
-                NFARegex reg = new NFARegex(@"\d\s\w");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("1 A")); // Expected: Match
-            }
-
-            {
-                // Test Case 10: Complex Pattern
-                NFARegex reg = new NFARegex(@"(\d{2,3}[a-z]){2}");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("12b45c")); // Expected: Match
-            }
-
-            {
-                // Test Case 11: Alternation
-                NFARegex reg = new NFARegex("cat|dog");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("dog")); // Expected: Match
-            }
-
-            {
-                // Test Case 12: Escaping Special Characters
-                NFARegex reg = new NFARegex(@"\[\d{3}\]");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("[123]")); // Expected: Match
-            }
-
-            {
-                // Test Case 13: Multiple Quantifiers
-                NFARegex reg = new NFARegex(@"\w{3,5}\d{2,3}");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("abc123")); // Expected: Match
-            }
-
-            {
-                // Test Case 14: Grouping and Quantifiers
-                NFARegex reg = new NFARegex(@"(ab)+\d{2}");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("abab12")); // Expected: Match
-            }
-
-            {
-                // Test Case 15: Complex Combination
-                NFARegex reg = new NFARegex(@"(\w{2}\d+)+[aeiou]+");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("ab12aeiou")); // Expected: Match
-            }
-
-            {
-                // Test Case 16: Nested Grouping
-                NFARegex reg = new NFARegex(@"(\d{2,3}[a-z]+){2,3}");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("12xyz34abc567defg")); // Expected: Match
-            }
-
-            {
-                // Test Case 17: Start and End Anchors
-                NFARegex reg = new NFARegex(@"^\d{3}-\w{2}$");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("123-AB")); // Expected: Match
-            }
-
-            {
-                // Test Case 18: Word Boundary
-                NFARegex reg = new NFARegex(@"\w+word\b");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("keyword")); // Expected: Match
-            }
-
-
-            {
-                //19
-                NFARegex reg = new NFARegex(@"[ \t\r\n]*\w+\s*=\s*[0-9]{1,}\s*");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("    aabb   =  9988 "));
-            }
-
-            {
-                //20
-                NFARegex reg = new NFARegex(@"(-\d{2,3}-\d{3})+");
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("-11-222-333-44")); //false
-                //21
-                Console.WriteLine("{0} {1}", i++, reg.IsMatch("-11-222-333-555")); //true
-            }
-
-            {
-                //22
-                NFARegex reg = new NFARegex(@"[a-f]*abc");
-                bool ret = reg.IsMatch("abcdefabcdefabc");
-                Console.WriteLine("{0} {1}", i++, ret);
-            }
-
-            {
-                //23
-                NFARegex reg = new NFARegex(@"a?a");
-                bool ret = reg.IsMatch("a");
-                Console.WriteLine("{0} {1} ", i++, ret);
-            }
-
-            {
-                //24
-                Stopwatch sw = new Stopwatch();
-                sw.Start();
-                NFARegex reg = new NFARegex(@"a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa");
-                bool ret = reg.IsMatch("aaaaaaaaaaaaaaaaaaaaaaaaa");//3s
-                Console.WriteLine("{0} {1} {2}", i++, ret, sw.Elapsed);
-                sw.Stop();
-            }
-
-            {
-                //25
-                Stopwatch sw = new Stopwatch();
-                sw.Start();
-                NFARegex reg = new NFARegex(@"a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*a*aaaaaaaaaaaaaa");
-                bool ret = reg.IsMatch("aaaaaaaaaaaaaa");
-                Console.WriteLine("{0} {1} {2}", i++, ret, sw.Elapsed);//10s
-                sw.Stop();
-            }
-
         }
 
     }

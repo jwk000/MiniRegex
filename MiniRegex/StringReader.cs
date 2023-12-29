@@ -57,7 +57,7 @@ namespace MiniRegex
             Index += n;
         }
 
-        public void RollBackTo(int idx)
+        public void SetIndex(int idx)
         {
             Index = idx;
         }
