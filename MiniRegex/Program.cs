@@ -34,23 +34,23 @@ namespace MiniRegex
             };
 
             Stopwatch sw = new Stopwatch();
-            //foreach (var tc in testcases)
-            //{
-            //    sw.Restart();
-            //    MiniRegex reg = new MiniRegex(tc[0]);
-            //    bool ret = reg.IsMatch(tc[1]);
-            //    sw.Stop();
-            //    Console.WriteLine("{0} --- {1}\n is match:{2} use:{3}ms\n", tc[0], tc[1],ret,sw.ElapsedMilliseconds);
-            //}
+            foreach (var tc in testcases)
+            {
+                sw.Restart();
+                MiniRegex reg = new MiniRegex(tc[0]);
+                bool ret = reg.IsMatch(tc[1]);
+                sw.Stop();
+                Console.WriteLine("{0} --- {1}\n is match:{2} use:{3}ms\n", tc[0], tc[1], ret, sw.ElapsedMilliseconds);
+            }
 
-            //foreach (var tc in testcases)
-            //{
-            //    sw.Restart();
-            //    NFARegex reg = new NFARegex(tc[0]);
-            //    bool ret = reg.IsMatch(tc[1]);
-            //    sw.Stop();
-            //    Console.WriteLine("{0} --- {1}\n is match:{2} use:{3}ms\n", tc[0], tc[1], ret, sw.ElapsedMilliseconds);
-            //}
+            foreach (var tc in testcases)
+            {
+                sw.Restart();
+                NFARegex reg = new NFARegex(tc[0]);
+                bool ret = reg.IsMatch(tc[1]);
+                sw.Stop();
+                Console.WriteLine("{0} --- {1}\n is match:{2} use:{3}ms\n", tc[0], tc[1], ret, sw.ElapsedMilliseconds);
+            }
 
             foreach (var tc in testcases)
             {

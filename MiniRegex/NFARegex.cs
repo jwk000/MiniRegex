@@ -194,9 +194,9 @@ namespace MiniRegex
                 throw new Exception("invalid pattern string");
             }
             NFAFrag frag = Exp.ToNFA();
-            DumpNFAGraph(frag, $"regex{id}.0");
+            //DumpNFAGraph(frag, $"regex{id}.0");
             frag.MergeEmpty();
-            DumpNFAGraph(frag, $"regex{id}.1");
+            //DumpNFAGraph(frag, $"regex{id}.1");
             Start = frag.Start;
             End = frag.End;
         }
