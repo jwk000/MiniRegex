@@ -70,6 +70,7 @@ namespace MiniRegex
 
     interface IExp
     {
+        string PatternString { get; }
         bool Parse(StringReader stringReader);
         bool Match(StringReader input);
         NFAFrag ToNFA();

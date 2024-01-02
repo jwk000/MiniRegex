@@ -41,32 +41,6 @@ namespace MiniRegex
             return Exp.Match(sr);
         }
 
-        public bool IsEqualExp(NFAState state)
-        {
-            if(Exp==null && state.Exp == null)
-            {
-                return true;
-            }
-
-            if(Exp!=null && state.Exp != null)
-            {
-                if(Exp is MetaExp && state.Exp is MetaExp)
-                {
-                    if((Exp as MetaExp).IsEqualExp(state.Exp as MetaExp))
-                    {
-                        return true;
-                    }
-                }
-                if(Exp is CharsetExp && state.Exp is CharsetExp)
-                {
-                    if((Exp as CharsetExp).IsEqualExp(state.Exp as CharsetExp))
-                    {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
     }
 
     class NFAFrag
@@ -124,15 +98,118 @@ namespace MiniRegex
             return ret;
         }
 
-        public override string ToString()
+        //合并空转换，如果s可以经过空转换到达t，则s直接转换到t
+        public void MergeEmpty()
+        {
+            Dictionary<NFAState, List<NFAState>> map = new Dictionary<NFAState, List<NFAState>>();
+            List<NFAState> list = new List<NFAState>();
+            List<NFAState> visited = new List<NFAState>();
+            list.Add(Start);
+            while (list.Count > 0)
+            {
+                var s = list[0];
+                list.RemoveAt(0);
+                if (visited.Contains(s))
+                {
+                    continue;
+                }
+                visited.Add(s);
+                var next = MergeState(s);
+                map.Add(s, next);
+                foreach(var t in next)
+                {
+                    if (!visited.Contains(t))
+                    {
+                        list.Add(t);
+                    }
+                }
+            }
+
+            list.Clear();
+            visited.Clear();
+            list.Add(Start);
+            while(list.Count > 0)
+            {
+                var s = list[0];
+                list.RemoveAt(0);
+                visited.Add(s);
+                s.Branchs.Clear();
+                s.Branchs.AddRange(map[s]);
+                foreach(var t in s.Branchs)
+                {
+                    if (!visited.Contains(t))
+                    {
+                        list.Add(t);
+                    }
+                }
+            }
+        }
+
+        List<NFAState> MergeState(NFAState state)
+        {
+            List<NFAState> ans = new List<NFAState>();
+            List<NFAState> queue = new List<NFAState>();
+            List<NFAState> visited = new List<NFAState>();
+            queue.Add(state);
+            while (queue.Count > 0)
+            {
+                var s = queue[0];
+                queue.RemoveAt(0);
+                if (visited.Contains(s))
+                {
+                    continue;
+                }
+                visited.Add(s);
+                foreach(var t in s.Branchs)
+                {
+                    if(t.Exp == null)
+                    {
+                        if (t == End) ans.Add(t);
+                        if (!visited.Contains(t))
+                        {
+                            queue.Add(t);
+                        }
+                    }
+                    else
+                    {
+                        ans.Add(t);
+                    }
+                }
+            }
+            return ans;
+        }
+
+    }
+
+    class NFARegex
+    {
+        static int id = 0;
+        NFAState Start, End;
+        PatternExp Exp = new PatternExp();
+        public NFARegex(string pattern)
+        {
+            id++;
+            if (!Exp.Parse(new StringReader(pattern)))
+            {
+                throw new Exception("invalid pattern string");
+            }
+            NFAFrag frag = Exp.ToNFA();
+            DumpNFAGraph(frag, $"regex{id}.0");
+            frag.MergeEmpty();
+            DumpNFAGraph(frag, $"regex{id}.1");
+            Start = frag.Start;
+            End = frag.End;
+        }
+
+        public string NFAToString(NFAState start, NFAState end)
         {
             StringBuilder sb = new StringBuilder();
             sb.Append("digraph G{");
             List<NFAState> list = new List<NFAState>();
             List<NFAState> visited = new List<NFAState>();
-            list.Add(Start);
-            sb.Append($"s{Start.ID}[label=\"start\"];");
-            sb.Append($"s{End.ID}[label=\"end\"];");
+            list.Add(start);
+            sb.Append($"s{start.ID}[label=\"start\"];");
+            sb.Append($"s{end.ID}[label=\"end\"];");
             while (list.Count > 0)
             {
                 var s = list[0];
@@ -161,91 +238,18 @@ namespace MiniRegex
             return sb.ToString();
         }
 
-        public void DumpGraph(string name)
+        public void DumpNFAGraph(NFAFrag frag, string name)
         {
-            if (!Directory.Exists("image"))
-            {
-                Directory.CreateDirectory("image");
-            }
-            File.WriteAllText($"{name}.dot", this.ToString());
+            Directory.CreateDirectory("dump");
+            File.WriteAllText($"dump/{name}.dot", NFAToString(frag.Start,frag.End));
             System.Diagnostics.Process process = new System.Diagnostics.Process();
             process.StartInfo.RedirectStandardOutput = true;
             process.StartInfo.UseShellExecute = false;
             process.StartInfo.CreateNoWindow = true;
             process.StartInfo.FileName = "dot";
-            process.StartInfo.Arguments = string.Format($"{name}.dot -Tjpg -o image/{name}.jpg");
+            process.StartInfo.Arguments = string.Format($"dump/{name}.dot -Tjpg -o dump/{name}.jpg");
             process.Start();
             process.WaitForExit();
-        }
-
-        public void Merge()
-        {
-            Dictionary<NFAState, List<NFAState>> dict = new Dictionary<NFAState, List<NFAState>>();
-            List<NFAState> list = new List<NFAState>();
-            List<NFAState> visited = new List<NFAState>();
-            list.Add(Start);
-            while (list.Count > 0)
-            {
-                var s = list[0];
-                list.RemoveAt(0);
-                visited.Add(s);
-                foreach (var b in s.Branchs)
-                {
-                    if (!dict.ContainsKey(b)) { dict[b] = new List<NFAState>(); }
-                    dict[b].Add(s);
-                    if (!visited.Contains(b))
-                    {
-                        list.Add(b);
-                    }
-                }
-            }
-            visited.Clear();
-            list.Add(Start);
-            while (list.Count > 0)
-            {
-                var s = list[0];
-                list.RemoveAt(0);
-                visited.Add(s);
-                for (int i = s.Branchs.Count - 1; i >= 0; i--)
-                {
-                    var b = s.Branchs[i];
-                    //如果b是空节点且只有一个前置节点s，s和b合并
-                    if (b.Exp == null && dict[b].Count == 1)
-                    {
-                        s.Branchs.RemoveAt(i);
-                        dict.Remove(b);
-                        s.Branchs = s.Branchs.Union(b.Branchs).ToList();
-                        list.Add(s);
-                        if (b == End) { End = s; }
-                        break;
-                    }
-                    if (!visited.Contains(b))
-                    {
-                        list.Add(b);
-                    }
-                }
-            }
-        }
-    }
-
-    class NFARegex
-    {
-        static int id = 0;
-        NFAState Start, End;
-        PatternExp Exp = new PatternExp();
-        public NFARegex(string pattern)
-        {
-            id++;
-            if (!Exp.Parse(new StringReader(pattern)))
-            {
-                throw new Exception("invalid pattern string");
-            }
-            NFAFrag frag = Exp.ToNFA();
-            frag.DumpGraph($"regex{id}.raw");
-            frag.Merge();
-            frag.DumpGraph($"regex{id}");
-            Start = frag.Start;
-            End = frag.End;
         }
 
         public bool IsMatch(string input)
@@ -313,7 +317,7 @@ namespace MiniRegex
             if (s == End) return true;
             if (End.Exp != null) return false;
             List<NFAState> Q = new List<NFAState>() { s };
-            while(Q.Count > 0)
+            while (Q.Count > 0)
             {
                 var h = Q[0];
                 Q.RemoveAt(0);
@@ -328,7 +332,6 @@ namespace MiniRegex
                         Q.Add(t);
                     }
                 }
-
             }
             return false;
         }
